@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>M. Mo3ty RaceTimer</title>
+<title>M. Mo3ty Race Timer</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0d1b3a">
 <style>
@@ -176,6 +176,7 @@
   .modal{
     background:var(--panel); border:1px solid #2a3b72; border-radius:16px;
     padding:24px; width:100%; max-width:420px;
+    max-height:88vh; overflow-y:auto;
   }
   .modal h3{margin-top:0;}
   .field{margin-bottom:18px;}
@@ -196,6 +197,16 @@
     background:#101b3d; color:var(--white); cursor:pointer; font-weight:600;
   }
   .toggle-row button.active{background:var(--yellow); color:#1a1400; border-color:var(--yellow);}
+  .names-grid{display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; padding-right:2px;}
+  .name-row{display:flex; align-items:center; gap:8px;}
+  .name-row .tag{
+    flex:none; width:44px; font-size:12px; color:var(--muted); text-align:center;
+    direction:ltr; unicode-bidi:isolate;
+  }
+  .name-row input[type=text]{
+    flex:1; padding:8px 10px; border-radius:8px; border:1px solid #33447c;
+    background:#101b3d; color:var(--white); font-size:14px;
+  }
   .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:6px;}
 </style>
 </head>
@@ -203,7 +214,7 @@
 
 <!-- HOME SCREEN -->
 <div id="home" class="screen active">
-  <div class="home-title">M. MO3TY RACETIMER</div>
+  <div class="home-title">M. MO3TY RACE TIMER</div>
   <div class="home-sub">اختر المحطة لبدء المسابقة</div>
   <div class="station-grid" id="stationGrid"></div>
 </div>
@@ -262,6 +273,10 @@
         <button id="stage2Btn">مرحلتين (محاولتين)</button>
       </div>
     </div>
+    <div class="field">
+      <label>أسماء اللاعبين (خاصة بهذه اللعبة فقط)</label>
+      <div class="names-grid" id="namesGrid"></div>
+    </div>
     <div class="modal-actions">
       <button class="btn reset" id="modalCancel">إلغاء</button>
       <button class="btn start" id="modalSave">حفظ وبدء من جديد</button>
@@ -289,11 +304,11 @@ const STATIONS = [
   {id:'tape',         name:'TAPE',                 stages:2, players:13, minPlayers:2, maxPlayers:13},
 ];
 
-const STORAGE_KEY = 'racetimer_station_configs_v1';
+const STORAGE_KEY = 'racetimer_station_configs_v2'; // v2: names are now per-station, not shared
 
 /* ===================== STATE ===================== */
 let configs = loadConfigs();
-let current = null;      // active station config object (with .players, .stages)
+let current = null;      // active station config object (with .players, .stages, .names)
 let raceState = 'idle';  // idle | running | stage-done | complete
 let stage = 1;
 let startTs = 0;
@@ -306,14 +321,27 @@ let resultsView = 'final';          // 'final' | 'stage1' | 'stage2' - only rele
 function loadConfigs(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // make sure every station has a names array even if the saved data predates this field
+      STATIONS.forEach(s=>{
+        if(!parsed[s.id]) parsed[s.id] = {name:s.name, players:s.players, stages:s.stages, names:new Array(13).fill('')};
+        if(!parsed[s.id].names) parsed[s.id].names = new Array(13).fill('');
+      });
+      return parsed;
+    }
   }catch(e){}
   const obj = {};
-  STATIONS.forEach(s => obj[s.id] = {name:s.name, players:s.players, stages:s.stages});
+  STATIONS.forEach(s => obj[s.id] = {name:s.name, players:s.players, stages:s.stages, names:new Array(13).fill('')});
   return obj;
 }
 function saveConfigs(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(configs)); }catch(e){}
+}
+// Falls back to "Player N" when no custom name was set for that slot in the active station
+function playerLabel(idx){
+  const n = current && current.names ? current.names[idx] : '';
+  return (n && n.trim()) ? n.trim() : `Player ${idx+1}`;
 }
 
 /* ===================== HOME SCREEN ===================== */
@@ -573,7 +601,7 @@ function renderLeaderboard(){
         <div class="secs">${totalSeconds(f.time)}<span class="secs-label">s</span></div>
       </div>
       <div class="time">${fmt(f.time)}</div>
-      <div class="name">Player ${f.idx+1} <span class="key-tag">${KEY_LABELS[KEY_ORDER[f.idx]]}</span></div>
+      <div class="name">${playerLabel(f.idx)} <span class="key-tag">${KEY_LABELS[KEY_ORDER[f.idx]]}</span></div>
     `;
     leaderboard.appendChild(row);
   });
@@ -586,7 +614,7 @@ function renderLeaderboard(){
         <div class="rank">–</div>
       </div>
       <div class="time">${liveTime}</div>
-      <div class="name">Player ${w.idx+1} <span class="key-tag">${KEY_LABELS[KEY_ORDER[w.idx]]}</span></div>
+      <div class="name">${playerLabel(w.idx)} <span class="key-tag">${KEY_LABELS[KEY_ORDER[w.idx]]}</span></div>
     `;
     leaderboard.appendChild(row);
   });
@@ -626,7 +654,8 @@ function buildTouchGrid(){
   for(let i=0;i<current.players;i++){
     const b = document.createElement('button');
     b.className='touch-key';
-    b.textContent = `${i+1} (${KEY_LABELS[KEY_ORDER[i]]})`;
+    b.title = playerLabel(i);
+    b.innerHTML = `<div style="font-size:16px;">${KEY_LABELS[KEY_ORDER[i]]}</div><div style="font-size:10px;opacity:.75; margin-top:2px; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${playerLabel(i)}</div>`;
     b.addEventListener('click', ()=> finishPlayer(i));
     touchGrid.appendChild(b);
   }
@@ -638,7 +667,22 @@ const stationNameInput = document.getElementById('stationNameInput');
 const playersCountEl = document.getElementById('playersCount');
 const stage1Btn = document.getElementById('stage1Btn');
 const stage2Btn = document.getElementById('stage2Btn');
+const namesGrid = document.getElementById('namesGrid');
 let modalPlayers, modalStages;
+
+function buildNamesGrid(){
+  namesGrid.innerHTML = '';
+  const names = current.names || new Array(13).fill('');
+  for(let i=0;i<13;i++){
+    const row = document.createElement('div');
+    row.className='name-row';
+    row.innerHTML = `
+      <div class="tag">P${i+1} (${KEY_LABELS[KEY_ORDER[i]]})</div>
+      <input type="text" data-idx="${i}" placeholder="Player ${i+1}" value="${(names[i]||'').replace(/"/g,'&quot;')}">
+    `;
+    namesGrid.appendChild(row);
+  }
+}
 
 document.getElementById('settingsBtn').addEventListener('click', ()=>{
   stationNameInput.value = current.name;
@@ -646,6 +690,7 @@ document.getElementById('settingsBtn').addEventListener('click', ()=>{
   modalStages = current.stages;
   playersCountEl.textContent = modalPlayers;
   syncStageButtons();
+  buildNamesGrid();
   modalBackdrop.classList.add('active');
 });
 document.getElementById('modalCancel').addEventListener('click', ()=> modalBackdrop.classList.remove('active'));
@@ -668,8 +713,17 @@ document.getElementById('modalSave').addEventListener('click', ()=>{
   current.name = stationNameInput.value.trim() || current.name;
   current.players = modalPlayers;
   current.stages = modalStages;
-  configs[current.id] = {name:current.name, players:current.players, stages:current.stages};
+
+  const names = current.names ? current.names.slice() : new Array(13).fill('');
+  namesGrid.querySelectorAll('input[type=text]').forEach(inp=>{
+    const idx = +inp.dataset.idx;
+    names[idx] = inp.value.trim();
+  });
+  current.names = names;
+
+  configs[current.id] = {name:current.name, players:current.players, stages:current.stages, names:current.names};
   saveConfigs();
+
   modalBackdrop.classList.remove('active');
   resetRace(true);
   buildTouchGrid();
