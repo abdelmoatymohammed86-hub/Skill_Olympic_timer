@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>A.MOOATY RaceTimer</title>
+<title>M. Mo3ty RaceTimer</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0d1b3a">
 <style>
@@ -21,7 +21,7 @@
     --radius:14px;
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;margin:0;}
+  html,body{height:100%;margin:0; overflow-y:auto;}
   body{
     background:radial-gradient(circle at 20% 0%, #1a2c62 0%, var(--navy-1) 55%);
     color:var(--white);
@@ -96,10 +96,11 @@
     max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:8px;
   }
   .row{
-    display:flex; align-items:center; gap:14px;
+    display:grid; grid-template-columns:auto 1fr 1fr; align-items:center; gap:14px;
     background:var(--panel); border:1px solid #263a72; border-radius:10px;
     padding:12px 16px;
   }
+  .row .rankSecs{display:flex; align-items:center; gap:8px; flex:none;}
   .row .rank{
     width:34px; height:34px; border-radius:50%; background:#2a3b72;
     display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex:none;
@@ -110,12 +111,21 @@
   .row.silver .rank{background:var(--silver); color:#141826;}
   .row.bronze{border-color:var(--bronze); background:linear-gradient(90deg,#2c1f14,#1b2a56);}
   .row.bronze .rank{background:var(--bronze); color:#1a1000;}
-  .row .name{flex:1; font-weight:600; font-size:15.5px;}
+  .row .name{font-weight:600; font-size:15.5px; text-align:left;}
   .row .key-tag{
     font-size:11px; color:var(--muted); border:1px solid #35468a;
     border-radius:6px; padding:2px 7px; font-variant-numeric:tabular-nums;
   }
-  .row .time{font-variant-numeric:tabular-nums; font-weight:700; font-size:15.5px; min-width:78px; text-align:left;}
+  .row .time{font-variant-numeric:tabular-nums; font-weight:700; font-size:15.5px; text-align:center;}
+  .row .secs{
+    font-variant-numeric:tabular-nums; font-weight:800; font-size:15.5px;
+    min-width:54px; text-align:center; color:var(--yellow);
+    background:#0d1734; border:1px solid #33447c; border-radius:8px; padding:4px 8px;
+  }
+  .row.gold .secs{color:var(--gold); border-color:var(--gold);}
+  .row.silver .secs{color:var(--silver); border-color:var(--silver);}
+  .row.bronze .secs{color:var(--bronze); border-color:var(--bronze);}
+  .row .secs-label{font-size:10px; color:var(--muted); margin-right:2px;}
   .row.waiting{opacity:.55;}
   .row.waiting .time{color:var(--muted); font-weight:400;}
 
@@ -128,12 +138,13 @@
   .hint-bar b{color:var(--white);}
 
   .touch-grid{
-    max-width:640px; margin:22px auto 0; display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:8px;
+    width:100%; max-width:720px; margin:22px auto 0;
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
   }
   .touch-key{
+    flex:1 1 70px; max-width:100px; min-width:64px;
     background:var(--panel); border:1px solid #2a3b72; color:var(--white);
-    border-radius:10px; padding:12px 0; font-weight:700; font-size:14px; cursor:pointer;
+    border-radius:10px; padding:14px 4px; font-weight:700; font-size:14px; cursor:pointer;
   }
   .touch-key:active{background:var(--yellow); color:#1a1400;}
   .touch-actions{display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap;}
@@ -180,7 +191,7 @@
 
 <!-- HOME SCREEN -->
 <div id="home" class="screen active">
-  <div class="home-title">A.MOOATY RACETIMER</div>
+  <div class="home-title">M. MO3TY RACETIMER</div>
   <div class="home-sub">اختر المحطة لبدء المسابقة</div>
   <div class="station-grid" id="stationGrid"></div>
 </div>
@@ -202,10 +213,9 @@
     <button class="btn start" id="startBtn">ENTER ابدأ</button>
     <button class="btn next" id="nextStageBtn" style="display:none;">المرحلة التالية</button>
     <button class="btn reset" id="resetBtn">0 ريستارت</button>
-    <button class="btn reset" id="toggleTouchBtn">إظهار/إخفاء الأزرار</button>
   </div>
 
-  <div class="touch-grid" id="touchGrid" style="display:none;"></div>
+  <div class="touch-grid" id="touchGrid"></div>
 </div>
 
 <div class="hint-bar">
@@ -250,15 +260,16 @@ const KEY_ORDER = ['1','2','3','4','5','6','7','8','9','+','-','*','/'];
 const KEY_LABELS = {'1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
                      '+':'+','-':'−','*':'×','/':'÷'};
 
-// Default station catalogue. Four stations = single stage (one screen each).
-// The two "Maintenance" stations = two stages (two attempts), same screen switches stage.
+// Default station catalogue.
+// Single stage (one screen each): Assembly 1, Visual Inspection, Assembly Maintenance, C&C Maintenance.
+// Two stages (two attempts, same screen switches stage): C&C Inspection, Tape.
 const STATIONS = [
-  {id:'assembly1',   name:'ASSEMBLY 1',        stages:1, players:6},
-  {id:'assembly2',   name:'ASSEMBLY 2',        stages:1, players:6},
-  {id:'ccInspect',   name:'C&C INSPECTION',    stages:1, players:6},
-  {id:'visualInspect',name:'VISUAL INSPECTION',stages:1, players:6},
-  {id:'assemblyMaint',name:'ASSEMBLY MAINTENANCE',stages:2, players:6, minPlayers:4, maxPlayers:10},
-  {id:'ccMaint',     name:'C&C MAINTENANCE',   stages:2, players:6, minPlayers:4, maxPlayers:10},
+  {id:'assembly1',    name:'ASSEMBLY 1',          stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'visualInspect', name:'VISUAL INSPECTION',   stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'assemblyMaint', name:'ASSEMBLY MAINTENANCE',stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'ccMaint',      name:'C&C MAINTENANCE',      stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'ccInspect',    name:'C&C INSPECTION',       stages:2, players:13, minPlayers:2, maxPlayers:13},
+  {id:'tape',         name:'TAPE',                 stages:2, players:13, minPlayers:2, maxPlayers:13},
 ];
 
 const STORAGE_KEY = 'racetimer_station_configs_v1';
@@ -272,7 +283,6 @@ let startTs = 0;
 let rafId = null;
 let finishOrder = [];               // order of key-indices finished, current stage
 let stageResults = {1:{}, 2:{}};    // stageResults[stage][keyIndex] = ms
-let touchVisible = false;
 
 /* ===================== PERSISTENCE ===================== */
 function loadConfigs(){
@@ -346,6 +356,11 @@ function fmt(ms){
   return `${p(m)}:${p(s)}:${p(cs)}`;
 }
 
+// e.g. 4 min 5 sec -> 245
+function totalSeconds(ms){
+  return Math.floor(ms/1000);
+}
+
 function resetRace(keepConfig){
   raceState='idle'; stage=1; startTs=0; finishOrder=[];
   stageResults={1:{},2:{}};
@@ -359,6 +374,58 @@ function resetRace(keepConfig){
   renderLeaderboard();
 }
 
+/* ===================== START WHISTLE (single steady high blast) ===================== */
+let audioCtx = null;
+function playStartSiren(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+    const dur = 1.2; // steady horn blast
+
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(400, now);
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(200, now);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.65, now + 0.02);
+    gain.gain.setValueAtTime(0.65, now + dur - 0.08);
+    gain.gain.linearRampToValueAtTime(0, now + dur);
+
+    osc.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now); osc2.start(now);
+    osc.stop(now + dur); osc2.stop(now + dur);
+  }catch(e){ /* audio not available - fail silently */ }
+}
+
+/* ===================== PLAYER STOP BEEP ===================== */
+function playStopBeep(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+    const dur = 0.15; // short sharp click/beep
+
+    const osc = audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1200, now);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.7, now + 0.005);
+    gain.gain.linearRampToValueAtTime(0, now + dur);
+
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now); osc.stop(now + dur);
+  }catch(e){ /* audio not available - fail silently */ }
+}
+
 function startRace(){
   if(raceState==='running') return;
   if(raceState==='complete') return; // must reset first
@@ -366,6 +433,7 @@ function startRace(){
   startTs = performance.now();
   finishOrder = [];
   raceStatus.textContent = current.stages===2 ? `STAGE ${stage} — RUNNING` : 'RUNNING';
+  playStartSiren();
   tick();
 }
 
@@ -383,6 +451,7 @@ function finishPlayer(keyIndex){
   const t = performance.now()-startTs;
   stageResults[stage][keyIndex] = t;
   finishOrder.push(keyIndex);
+  playStopBeep();
   renderLeaderboard();
   if(finishOrder.length >= current.players){
     finishStage();
@@ -453,9 +522,12 @@ function renderLeaderboard(){
     const row = document.createElement('div');
     row.className = 'row' + (i<3 ? ' '+medalClass[i] : '');
     row.innerHTML = `
-      <div class="rank">${i+1}</div>
-      <div class="name">Player ${f.idx+1} <span class="key-tag">${KEY_LABELS[KEY_ORDER[f.idx]]}</span></div>
+      <div class="rankSecs">
+        <div class="rank">${i+1}</div>
+        <div class="secs">${totalSeconds(f.time)}<span class="secs-label">s</span></div>
+      </div>
       <div class="time">${fmt(f.time)}</div>
+      <div class="name">Player ${f.idx+1} <span class="key-tag">${KEY_LABELS[KEY_ORDER[f.idx]]}</span></div>
     `;
     leaderboard.appendChild(row);
   });
@@ -463,9 +535,11 @@ function renderLeaderboard(){
     const row = document.createElement('div');
     row.className='row waiting';
     row.innerHTML = `
-      <div class="rank">–</div>
-      <div class="name">Player ${w.idx+1} <span class="key-tag">${KEY_LABELS[KEY_ORDER[w.idx]]}</span></div>
+      <div class="rankSecs">
+        <div class="rank">–</div>
+      </div>
       <div class="time">WAITING</div>
+      <div class="name">Player ${w.idx+1} <span class="key-tag">${KEY_LABELS[KEY_ORDER[w.idx]]}</span></div>
     `;
     leaderboard.appendChild(row);
   });
@@ -510,10 +584,6 @@ function buildTouchGrid(){
     touchGrid.appendChild(b);
   }
 }
-document.getElementById('toggleTouchBtn').addEventListener('click', ()=>{
-  touchVisible = !touchVisible;
-  touchGrid.style.display = touchVisible ? 'grid':'none';
-});
 
 /* ===================== SETTINGS MODAL ===================== */
 const modalBackdrop = document.getElementById('modalBackdrop');
