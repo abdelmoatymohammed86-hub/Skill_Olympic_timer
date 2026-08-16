@@ -92,6 +92,14 @@
     background:#22326a; color:var(--yellow); font-size:12px; font-weight:700;
     padding:5px 14px; border-radius:999px; letter-spacing:1px;
   }
+  .stage-view-bar{
+    display:flex; justify-content:center; gap:10px; margin:0 auto 18px; flex-wrap:wrap;
+  }
+  .stage-view-bar .view-btn{
+    background:#101b3d; border:1px solid #33447c; color:var(--muted);
+    border-radius:999px; padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .stage-view-bar .view-btn.active{background:var(--yellow); color:#1a1400; border-color:var(--yellow);}
   .leaderboard{
     max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:8px;
   }
@@ -111,7 +119,10 @@
   .row.silver .rank{background:var(--silver); color:#141826;}
   .row.bronze{border-color:var(--bronze); background:linear-gradient(90deg,#2c1f14,#1b2a56);}
   .row.bronze .rank{background:var(--bronze); color:#1a1000;}
-  .row .name{font-weight:600; font-size:15.5px; text-align:left;}
+  .row .name{
+    font-weight:600; font-size:15.5px; text-align:left;
+    direction:ltr; unicode-bidi:isolate;
+  }
   .row .key-tag{
     font-size:11px; color:var(--muted); border:1px solid #35468a;
     border-radius:6px; padding:2px 7px; font-variant-numeric:tabular-nums;
@@ -145,6 +156,7 @@
     flex:1 1 70px; max-width:100px; min-width:64px;
     background:var(--panel); border:1px solid #2a3b72; color:var(--white);
     border-radius:10px; padding:14px 4px; font-weight:700; font-size:14px; cursor:pointer;
+    direction:ltr; unicode-bidi:isolate;
   }
   .touch-key:active{background:var(--yellow); color:#1a1400;}
   .touch-actions{display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap;}
@@ -206,6 +218,11 @@
   <div class="race-status" id="raceStatus">PRESS ENTER TO START</div>
   <div class="race-clock" id="raceClock">00:00:00</div>
   <div class="stage-pill" id="stagePill" style="display:none;">STAGE 1 / 2</div>
+  <div class="stage-view-bar" id="stageViewBar" style="display:none;">
+    <button class="view-btn" data-view="stage1">نتيجة المرحلة 1</button>
+    <button class="view-btn" data-view="stage2">نتيجة المرحلة 2</button>
+    <button class="view-btn active" data-view="final">النتيجة النهائية</button>
+  </div>
 
   <div class="leaderboard" id="leaderboard"></div>
 
@@ -283,6 +300,7 @@ let startTs = 0;
 let rafId = null;
 let finishOrder = [];               // order of key-indices finished, current stage
 let stageResults = {1:{}, 2:{}};    // stageResults[stage][keyIndex] = ms
+let resultsView = 'final';          // 'final' | 'stage1' | 'stage2' - only relevant once both stages complete
 
 /* ===================== PERSISTENCE ===================== */
 function loadConfigs(){
@@ -346,6 +364,7 @@ const raceClock  = document.getElementById('raceClock');
 const stagePill  = document.getElementById('stagePill');
 const leaderboard= document.getElementById('leaderboard');
 const nextStageBtn = document.getElementById('nextStageBtn');
+const stageViewBar = document.getElementById('stageViewBar');
 
 function fmt(ms){
   const totalCs = Math.floor(ms/10);
@@ -364,6 +383,7 @@ function totalSeconds(ms){
 function resetRace(keepConfig){
   raceState='idle'; stage=1; startTs=0; finishOrder=[];
   stageResults={1:{},2:{}};
+  resultsView='final';
   cancelAnimationFrame(rafId);
   raceTitle.textContent = current.name;
   raceStatus.textContent = 'PRESS ENTER TO START';
@@ -371,6 +391,7 @@ function resetRace(keepConfig){
   stagePill.style.display = current.stages===2 ? 'block':'none';
   stagePill.textContent = `STAGE ${stage} / ${current.stages}`;
   nextStageBtn.style.display='none';
+  stageViewBar.style.display='none';
   renderLeaderboard();
 }
 
@@ -468,18 +489,37 @@ function finishStage(){
   } else {
     raceState='complete';
     raceStatus.textContent = 'RACE COMPLETE';
+    if(current.stages===2){
+      stageViewBar.style.display='flex';
+      setResultsView('final');
+    }
   }
   renderLeaderboard();
 }
 
+// Moves into Stage 2 in a READY (not running) state — a separate ENTER press starts it.
 function goToStage2(){
   if(raceState!=='stage-done') return;
   stage=2;
   finishOrder=[];
+  raceState='idle';
+  raceClock.textContent = '00:00:00';
   stagePill.textContent = `STAGE ${stage} / ${current.stages}`;
+  raceStatus.textContent = `STAGE ${stage} — PRESS ENTER TO START`;
   nextStageBtn.style.display='none';
-  startRace();
+  renderLeaderboard();
 }
+
+function setResultsView(view){
+  resultsView = view;
+  document.querySelectorAll('.view-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.view===view);
+  });
+  renderLeaderboard();
+}
+document.querySelectorAll('.view-btn').forEach(b=>{
+  b.addEventListener('click', ()=> setResultsView(b.dataset.view));
+});
 
 function computeFinalRanking(){
   // combine: for each player, best (lowest) time across stages they finished, else null
@@ -503,14 +543,20 @@ function renderLeaderboard(){
   leaderboard.innerHTML='';
   const medalClass = ['gold','silver','bronze'];
 
-  if(current.stages===2 && (stage===2 || raceState==='complete')){
-    // show combined ranking once stage 2 is underway/finished, else fall through to live stage view
-  }
-
   let finished, waiting;
   if(current.stages===2 && raceState==='complete'){
-    const r = computeFinalRanking();
-    finished = r.finished; waiting = r.waiting;
+    if(resultsView==='stage1'){
+      finished = Object.entries(stageResults[1]).map(([idx,time])=>({idx:+idx,time})).sort((a,b)=>a.time-b.time);
+      const doneIdx = finished.map(f=>f.idx);
+      waiting = []; for(let i=0;i<current.players;i++) if(!doneIdx.includes(i)) waiting.push({idx:i,time:null});
+    } else if(resultsView==='stage2'){
+      finished = Object.entries(stageResults[2]).map(([idx,time])=>({idx:+idx,time})).sort((a,b)=>a.time-b.time);
+      const doneIdx = finished.map(f=>f.idx);
+      waiting = []; for(let i=0;i<current.players;i++) if(!doneIdx.includes(i)) waiting.push({idx:i,time:null});
+    } else {
+      const r = computeFinalRanking();
+      finished = r.finished; waiting = r.waiting;
+    }
   } else {
     finished = finishOrder.map(idx => ({idx, time: stageResults[stage][idx]}));
     const waitingIdx = [];
@@ -534,11 +580,12 @@ function renderLeaderboard(){
   waiting.forEach(w=>{
     const row = document.createElement('div');
     row.className='row waiting';
+    const liveTime = raceState==='running' ? fmt(performance.now()-startTs) : 'WAITING';
     row.innerHTML = `
       <div class="rankSecs">
         <div class="rank">–</div>
       </div>
-      <div class="time">WAITING</div>
+      <div class="time">${liveTime}</div>
       <div class="name">Player ${w.idx+1} <span class="key-tag">${KEY_LABELS[KEY_ORDER[w.idx]]}</span></div>
     `;
     leaderboard.appendChild(row);
