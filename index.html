@@ -22,6 +22,16 @@
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0; overflow-y:auto;}
+  /* Fallback rotation when the Screen Orientation API isn't available (plain browser tab) */
+  body.force-landscape{
+    transform:rotate(90deg);
+    transform-origin:left top;
+    width:100vh;
+    height:100vw;
+    position:absolute;
+    top:0;
+    left:100%;
+  }
   body{
     background:radial-gradient(circle at 20% 0%, #1a2c62 0%, var(--navy-1) 55%);
     color:var(--white);
@@ -34,7 +44,7 @@
   .screen.active{display:flex;}
 
   /* ---------- HOME ---------- */
-  #home{padding:28px 20px 40px; align-items:center;}
+  #home{padding:28px 20px 40px; align-items:center; position:relative;}
   .home-title{
     font-size:clamp(28px,6vw,44px);
     font-weight:800;
@@ -214,6 +224,7 @@
 
 <!-- HOME SCREEN -->
 <div id="home" class="screen active">
+  <button class="icon-btn" id="rotateBtnHome" title="تدوير الشاشة" style="position:absolute; top:20px; left:20px;">⤾</button>
   <div class="home-title">M. MO3TY RACE TIMER</div>
   <div class="home-sub">اختر المحطة لبدء المسابقة</div>
   <div class="station-grid" id="stationGrid"></div>
@@ -223,7 +234,10 @@
 <div id="race" class="screen">
   <div class="race-top">
     <button class="back-btn" id="backBtn">⟵ المحطات</button>
-    <button class="icon-btn" id="settingsBtn" title="إعدادات">⚙</button>
+    <div style="display:flex; gap:8px;">
+      <button class="icon-btn" id="rotateBtn" title="تدوير الشاشة">⤾</button>
+      <button class="icon-btn" id="settingsBtn" title="إعدادات">⚙</button>
+    </div>
   </div>
   <div class="race-title" id="raceTitle">LET'S GO</div>
   <div class="race-status" id="raceStatus">PRESS ENTER TO START</div>
@@ -728,6 +742,30 @@ document.getElementById('modalSave').addEventListener('click', ()=>{
   resetRace(true);
   buildTouchGrid();
 });
+
+/* ===================== SCREEN ROTATION TOGGLE ===================== */
+// Cycles portrait <-> landscape. Works once the app is installed/fullscreen (PWA) -
+// most browsers block screen.orientation.lock() inside a plain browser tab.
+let lockedOrientation = 'portrait';
+
+async function toggleOrientation(){
+  const target = lockedOrientation === 'landscape' ? 'portrait' : 'landscape';
+  try{
+    if(document.documentElement.requestFullscreen && !document.fullscreenElement){
+      await document.documentElement.requestFullscreen().catch(()=>{});
+    }
+    if(screen.orientation && screen.orientation.lock){
+      await screen.orientation.lock(target);
+    }
+    lockedOrientation = target;
+  }catch(err){
+    // Not supported in this context (e.g. plain browser tab) - just flip our own layout instead.
+    lockedOrientation = target;
+    document.body.classList.toggle('force-landscape', target==='landscape');
+  }
+}
+document.getElementById('rotateBtn').addEventListener('click', toggleOrientation);
+document.getElementById('rotateBtnHome').addEventListener('click', toggleOrientation);
 
 /* ===================== INIT ===================== */
 renderHome();
