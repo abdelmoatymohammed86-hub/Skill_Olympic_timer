@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>M. Mo3ty Race Timer</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1b3a">
+<style>
+  :root{
+    --navy-1:#0a1530;
+    --navy-2:#16224a;
+    --panel:#1b2a56;
+    --yellow:#f5c518;
+    --white:#f4f6fb;
+    --muted:#8fa0c9;
+    --gold:#f4c542;
+    --silver:#c7cede;
+    --bronze:#d08a4f;
+    --danger:#ff5f5f;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0; overflow-y:auto;}
+  body{
+    background:radial-gradient(circle at 20% 0%, #1a2c62 0%, var(--navy-1) 55%);
+    color:var(--white);
+    font-family:"Segoe UI","Arial",sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    overflow-x:hidden;
+    min-height:100%;
+  }
+  .screen{display:none; min-height:100vh; flex-direction:column;}
+  .screen.active{display:flex;}
+
+  /* ---------- HOME ---------- */
+  #home{padding:28px 20px 40px; align-items:center;}
+  .home-title{
+    font-size:clamp(28px,6vw,44px);
+    font-weight:800;
+    letter-spacing:2px;
+    text-align:center;
+    margin:10px 0 4px;
+  }
+  .home-sub{color:var(--muted); text-align:center; margin-bottom:28px; font-size:15px;}
+  .station-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+    gap:16px;
+    width:100%;
+    max-width:900px;
+  }
+  .station-card{
+    background:linear-gradient(160deg,var(--panel),#101b3d);
+    border:1px solid #2a3b72;
+    border-radius:var(--radius);
+    padding:20px;
+    cursor:pointer;
+    transition:transform .15s ease, border-color .15s ease;
+    text-align:right;
+  }
+  .station-card:hover, .station-card:focus-visible{transform:translateY(-3px); border-color:var(--yellow);}
+  .station-card .eyebrow{color:var(--yellow); font-size:12px; letter-spacing:1px; font-weight:700;}
+  .station-card h3{margin:6px 0 4px; font-size:21px;}
+  .station-card p{margin:0; color:var(--muted); font-size:13px;}
+
+  /* ---------- RACE SCREEN ---------- */
+  #race{padding:22px 18px 90px;}
+  .race-top{display:flex; justify-content:space-between; align-items:flex-start; gap:12px;}
+  .back-btn{
+    background:none; border:1px solid #33447c; color:var(--white);
+    border-radius:10px; padding:8px 14px; font-size:14px; cursor:pointer;
+  }
+  .icon-btn{
+    background:none; border:1px solid #33447c; color:var(--white);
+    border-radius:10px; width:40px; height:40px; font-size:18px; cursor:pointer;
+  }
+  .race-title{
+    text-align:center; font-size:clamp(30px,7vw,54px); font-weight:800;
+    letter-spacing:3px; margin:6px 0 2px;
+  }
+  .race-status{
+    text-align:center; color:var(--yellow); font-weight:700; letter-spacing:2px;
+    font-size:14px; min-height:20px; margin-bottom:6px;
+  }
+  .race-clock{
+    text-align:center; font-size:clamp(40px,10vw,68px); font-weight:800;
+    font-variant-numeric:tabular-nums; letter-spacing:2px; margin-bottom:18px;
+  }
+  .stage-pill{
+    display:block; margin:0 auto 18px; width:max-content;
+    background:#22326a; color:var(--yellow); font-size:12px; font-weight:700;
+    padding:5px 14px; border-radius:999px; letter-spacing:1px;
+  }
+  .stage-view-bar{
+    display:flex; justify-content:center; gap:10px; margin:0 auto 18px; flex-wrap:wrap;
+  }
+  .stage-view-bar .view-btn{
+    background:#101b3d; border:1px solid #33447c; color:var(--muted);
+    border-radius:999px; padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .stage-view-bar .view-btn.active{background:var(--yellow); color:#1a1400; border-color:var(--yellow);}
+  .leaderboard{
+    max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:8px;
+  }
+  .row{
+    display:grid; grid-template-columns:auto 1fr 1fr; align-items:center; gap:14px;
+    background:var(--panel); border:1px solid #263a72; border-radius:10px;
+    padding:12px 16px;
+  }
+  .row .rankSecs{display:flex; align-items:center; gap:8px; flex:none;}
+  .row .rank{
+    width:34px; height:34px; border-radius:50%; background:#2a3b72;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex:none;
+  }
+  .row.gold{border-color:var(--gold); background:linear-gradient(90deg,#2d2812,#1b2a56);}
+  .row.gold .rank{background:var(--gold); color:#1a1400;}
+  .row.silver{border-color:var(--silver); background:linear-gradient(90deg,#242938,#1b2a56);}
+  .row.silver .rank{background:var(--silver); color:#141826;}
+  .row.bronze{border-color:var(--bronze); background:linear-gradient(90deg,#2c1f14,#1b2a56);}
+  .row.bronze .rank{background:var(--bronze); color:#1a1000;}
+  .row .name{
+    font-weight:600; font-size:15.5px; text-align:left;
+    direction:ltr; unicode-bidi:isolate;
+  }
+  .row .key-tag{
+    font-size:11px; color:var(--muted); border:1px solid #35468a;
+    border-radius:6px; padding:2px 7px; font-variant-numeric:tabular-nums;
+  }
+  .row .time{font-variant-numeric:tabular-nums; font-weight:700; font-size:15.5px; text-align:center;}
+  .row .secs{
+    font-variant-numeric:tabular-nums; font-weight:800; font-size:15.5px;
+    min-width:54px; text-align:center; color:var(--yellow);
+    background:#0d1734; border:1px solid #33447c; border-radius:8px; padding:4px 8px;
+  }
+  .row.gold .secs{color:var(--gold); border-color:var(--gold);}
+  .row.silver .secs{color:var(--silver); border-color:var(--silver);}
+  .row.bronze .secs{color:var(--bronze); border-color:var(--bronze);}
+  .row .secs-label{font-size:10px; color:var(--muted); margin-right:2px;}
+  .row.waiting{opacity:.55;}
+  .row.waiting .time{color:var(--muted); font-weight:400;}
+
+  .hint-bar{
+    position:fixed; left:0; right:0; bottom:0;
+    background:#0d1734; border-top:1px solid #263a72;
+    text-align:center; padding:10px 8px; font-size:12px; color:var(--muted);
+    letter-spacing:.5px;
+  }
+  .hint-bar b{color:var(--white);}
+
+  .touch-grid{
+    width:100%; max-width:720px; margin:22px auto 0;
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+  }
+  .touch-key{
+    flex:1 1 70px; max-width:100px; min-width:64px;
+    background:var(--panel); border:1px solid #2a3b72; color:var(--white);
+    border-radius:10px; padding:14px 4px; font-weight:700; font-size:14px; cursor:pointer;
+    direction:ltr; unicode-bidi:isolate;
+  }
+  .touch-key:active{background:var(--yellow); color:#1a1400;}
+  .touch-actions{display:flex; gap:10px; justify-content:center; margin-top:16px; flex-wrap:wrap;}
+  .btn{
+    border:none; border-radius:10px; padding:12px 22px; font-weight:700; font-size:14px; cursor:pointer;
+  }
+  .btn.start{background:var(--yellow); color:#1a1400;}
+  .btn.reset{background:#2a3b72; color:var(--white);}
+  .btn.next{background:#3a8f5c; color:#04150a;}
+
+  /* ---------- SETTINGS MODAL ---------- */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(4,8,20,.72);
+    display:none; align-items:center; justify-content:center; padding:20px; z-index:50;
+  }
+  .modal-backdrop.active{display:flex;}
+  .modal{
+    background:var(--panel); border:1px solid #2a3b72; border-radius:16px;
+    padding:24px; width:100%; max-width:420px;
+    max-height:88vh; overflow-y:auto;
+  }
+  .modal h3{margin-top:0;}
+  .field{margin-bottom:18px;}
+  .field label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px;}
+  .field input[type=text]{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid #33447c;
+    background:#101b3d; color:var(--white); font-size:15px;
+  }
+  .stepper{display:flex; align-items:center; gap:14px;}
+  .stepper button{
+    width:38px; height:38px; border-radius:8px; border:1px solid #33447c;
+    background:#101b3d; color:var(--white); font-size:18px; cursor:pointer;
+  }
+  .stepper span{font-size:20px; font-weight:800; min-width:36px; text-align:center;}
+  .toggle-row{display:flex; gap:10px;}
+  .toggle-row button{
+    flex:1; padding:10px; border-radius:8px; border:1px solid #33447c;
+    background:#101b3d; color:var(--white); cursor:pointer; font-weight:600;
+  }
+  .toggle-row button.active{background:var(--yellow); color:#1a1400; border-color:var(--yellow);}
+  .names-grid{display:flex; flex-direction:column; gap:8px; max-height:260px; overflow-y:auto; padding-right:2px;}
+  .name-row{display:flex; align-items:center; gap:8px;}
+  .name-row .tag{
+    flex:none; width:44px; font-size:12px; color:var(--muted); text-align:center;
+    direction:ltr; unicode-bidi:isolate;
+  }
+  .name-row input[type=text]{
+    flex:1; padding:8px 10px; border-radius:8px; border:1px solid #33447c;
+    background:#101b3d; color:var(--white); font-size:14px;
+  }
+  .modal-actions{display:flex; gap:10px; justify-content:flex-end; margin-top:6px;}
+</style>
+</head>
+<body>
+
+<!-- HOME SCREEN -->
+<div id="home" class="screen active">
+  <div class="home-title">M. MO3TY RACE TIMER</div>
+  <div class="home-sub">اختر المحطة لبدء المسابقة</div>
+  <div class="station-grid" id="stationGrid"></div>
+</div>
+
+<!-- RACE SCREEN -->
+<div id="race" class="screen">
+  <div class="race-top">
+    <button class="back-btn" id="backBtn">⟵ المحطات</button>
+    <button class="icon-btn" id="settingsBtn" title="إعدادات">⚙</button>
+  </div>
+  <div class="race-title" id="raceTitle">LET'S GO</div>
+  <div class="race-status" id="raceStatus">PRESS ENTER TO START</div>
+  <div class="race-clock" id="raceClock">00:00:00</div>
+  <div class="stage-pill" id="stagePill" style="display:none;">STAGE 1 / 2</div>
+  <div class="stage-view-bar" id="stageViewBar" style="display:none;">
+    <button class="view-btn" data-view="stage1">نتيجة المرحلة 1</button>
+    <button class="view-btn" data-view="stage2">نتيجة المرحلة 2</button>
+    <button class="view-btn active" data-view="final">النتيجة النهائية</button>
+  </div>
+
+  <div class="leaderboard" id="leaderboard"></div>
+
+  <div class="touch-actions">
+    <button class="btn start" id="startBtn">ENTER ابدأ</button>
+    <button class="btn next" id="nextStageBtn" style="display:none;">المرحلة التالية</button>
+    <button class="btn reset" id="resetBtn">0 ريستارت</button>
+  </div>
+
+  <div class="touch-grid" id="touchGrid"></div>
+</div>
+
+<div class="hint-bar">
+  <b>ENTER</b> = بدء &nbsp;|&nbsp; <b>1-9 + − × ÷</b> = إنهاء اللاعب &nbsp;|&nbsp; <b>0</b> = ريستارت &nbsp;|&nbsp; <b>⚙</b> = إعدادات
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h3>إعدادات المحطة</h3>
+    <div class="field">
+      <label>اسم المحطة</label>
+      <input type="text" id="stationNameInput">
+    </div>
+    <div class="field">
+      <label>عدد المتسابقين (٢ - ١٣)</label>
+      <div class="stepper">
+        <button id="playersMinus">−</button>
+        <span id="playersCount">6</span>
+        <button id="playersPlus">+</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>عدد المراحل</label>
+      <div class="toggle-row">
+        <button id="stage1Btn" class="active">مرحلة واحدة</button>
+        <button id="stage2Btn">مرحلتين (محاولتين)</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>أسماء اللاعبين (خاصة بهذه اللعبة فقط)</label>
+      <div class="names-grid" id="namesGrid"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn reset" id="modalCancel">إلغاء</button>
+      <button class="btn start" id="modalSave">حفظ وبدء من جديد</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== CONFIG ===================== */
+// The 13 physical inputs (numeric keypad emulated as a USB keyboard):
+// 1,2,3,4,5,6,7,8,9,+,-,*,/  -> one key per competitor slot
+const KEY_ORDER = ['1','2','3','4','5','6','7','8','9','+','-','*','/'];
+const KEY_LABELS = {'1':'1','2':'2','3':'3','4':'4','5':'5','6':'6','7':'7','8':'8','9':'9',
+                     '+':'+','-':'−','*':'×','/':'÷'};
+
+// Default station catalogue.
+// Single stage (one screen each): Assembly 1, Visual Inspection, Assembly Maintenance, C&C Maintenance.
+// Two stages (two attempts, same screen switches stage): C&C Inspection, Tape.
+const STATIONS = [
+  {id:'assembly1',    name:'ASSEMBLY 1',          stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'visualInspect', name:'VISUAL INSPECTION',   stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'assemblyMaint', name:'ASSEMBLY MAINTENANCE',stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'ccMaint',      name:'C&C MAINTENANCE',      stages:1, players:13, minPlayers:2, maxPlayers:13},
+  {id:'ccInspect',    name:'C&C INSPECTION',       stages:2, players:13, minPlayers:2, maxPlayers:13},
+  {id:'tape',         name:'TAPE',                 stages:2, players:13, minPlayers:2, maxPlayers:13},
+];
+
+const STORAGE_KEY = 'racetimer_station_configs_v2'; // v2: names are now per-station, not shared
+
+/* ===================== STATE ===================== */
+let configs = loadConfigs();
+let current = null;      // active station config object (with .players, .stages, .names)
+let raceState = 'idle';  // idle | running | stage-done | complete
+let stage = 1;
+let startTs = 0;
+let rafId = null;
+let finishOrder = [];               // order of key-indices finished, current stage
+let stageResults = {1:{}, 2:{}};    // stageResults[stage][keyIndex] = ms
+let resultsView = 'final';          // 'final' | 'stage1' | 'stage2' - only relevant once both stages complete
+
+/* ===================== PERSISTENCE ===================== */
+function loadConfigs(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      // make sure every station has a names array even if the saved data predates this field
+      STATIONS.forEach(s=>{
+        if(!parsed[s.id]) parsed[s.id] = {name:s.name, players:s.players, stages:s.stages, names:new Array(13).fill('')};
+        if(!parsed[s.id].names) parsed[s.id].names = new Array(13).fill('');
+      });
+      return parsed;
+    }
+  }catch(e){}
+  const obj = {};
+  STATIONS.forEach(s => obj[s.id] = {name:s.name, players:s.players, stages:s.stages, names:new Array(13).fill('')});
+  return obj;
+}
+function saveConfigs(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(configs)); }catch(e){}
+}
+// Falls back to "Player N" when no custom name was set for that slot in the active station
+function playerLabel(idx){
+  const n = current && current.names ? current.names[idx] : '';
+  return (n && n.trim()) ? n.trim() : `Player ${idx+1}`;
+}
+
+/* ===================== HOME SCREEN ===================== */
+const stationGrid = document.getElementById('stationGrid');
+function renderHome(){
+  stationGrid.innerHTML = '';
+  STATIONS.forEach(st => {
+    const cfg = configs[st.id];
+    const card = document.createElement('div');
+    card.className = 'station-card';
+    card.tabIndex = 0;
+    card.innerHTML = `
+      <div class="eyebrow">${cfg.stages===2 ? 'مرحلتين' : 'مرحلة واحدة'}</div>
+      <h3>${cfg.name}</h3>
+      <p>${cfg.players} متسابقين</p>
+    `;
+    card.addEventListener('click', () => openStation(st.id));
+    card.addEventListener('keypress', e => { if(e.key==='Enter') openStation(st.id); });
+    stationGrid.appendChild(card);
+  });
+}
+
+function openStation(id){
+  current = { id, ...configs[id] };
+  const meta = STATIONS.find(s=>s.id===id);
+  current.minPlayers = meta.minPlayers || 2;
+  current.maxPlayers = meta.maxPlayers || 13;
+  resetRace(true);
+  showScreen('race');
+  buildTouchGrid();
+}
+
+/* ===================== SCREEN NAV ===================== */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+document.getElementById('backBtn').addEventListener('click', ()=>{
+  cancelAnimationFrame(rafId);
+  renderHome();
+  showScreen('home');
+});
+
+/* ===================== RACE LOGIC ===================== */
+const raceTitle  = document.getElementById('raceTitle');
+const raceStatus = document.getElementById('raceStatus');
+const raceClock  = document.getElementById('raceClock');
+const stagePill  = document.getElementById('stagePill');
+const leaderboard= document.getElementById('leaderboard');
+const nextStageBtn = document.getElementById('nextStageBtn');
+const stageViewBar = document.getElementById('stageViewBar');
+
+function fmt(ms){
+  const totalCs = Math.floor(ms/10);
+  const m = Math.floor(totalCs/6000);
+  const s = Math.floor((totalCs%6000)/100);
+  const cs = totalCs%100;
+  const p = n=>String(n).padStart(2,'0');
+  return `${p(m)}:${p(s)}:${p(cs)}`;
+}
+
+// e.g. 4 min 5 sec -> 245
+function totalSeconds(ms){
+  return Math.floor(ms/1000);
+}
+
+function resetRace(keepConfig){
+  raceState='idle'; stage=1; startTs=0; finishOrder=[];
+  stageResults={1:{},2:{}};
+  resultsView='final';
+  cancelAnimationFrame(rafId);
+  raceTitle.textContent = current.name;
+  raceStatus.textContent = 'PRESS ENTER TO START';
+  raceClock.textContent = '00:00:00';
+  stagePill.style.display = current.stages===2 ? 'block':'none';
+  stagePill.textContent = `STAGE ${stage} / ${current.stages}`;
+  nextStageBtn.style.display='none';
+  stageViewBar.style.display='none';
+  renderLeaderboard();
+}
+
+/* ===================== START WHISTLE (single steady high blast) ===================== */
+let audioCtx = null;
+function playStartSiren(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+    const dur = 1.2; // steady horn blast
+
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(400, now);
+    const osc2 = audioCtx.createOscillator();
+    osc2.type = 'square';
+    osc2.frequency.setValueAtTime(200, now);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.65, now + 0.02);
+    gain.gain.setValueAtTime(0.65, now + dur - 0.08);
+    gain.gain.linearRampToValueAtTime(0, now + dur);
+
+    osc.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now); osc2.start(now);
+    osc.stop(now + dur); osc2.stop(now + dur);
+  }catch(e){ /* audio not available - fail silently */ }
+}
+
+/* ===================== PLAYER STOP BEEP ===================== */
+function playStopBeep(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+    const dur = 0.15; // short sharp click/beep
+
+    const osc = audioCtx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1200, now);
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.7, now + 0.005);
+    gain.gain.linearRampToValueAtTime(0, now + dur);
+
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now); osc.stop(now + dur);
+  }catch(e){ /* audio not available - fail silently */ }
+}
+
+function startRace(){
+  if(raceState==='running') return;
+  if(raceState==='complete') return; // must reset first
+  raceState='running';
+  startTs = performance.now();
+  finishOrder = [];
+  raceStatus.textContent = current.stages===2 ? `STAGE ${stage} — RUNNING` : 'RUNNING';
+  playStartSiren();
+  tick();
+}
+
+function tick(){
+  if(raceState!=='running') return;
+  raceClock.textContent = fmt(performance.now()-startTs);
+  renderLeaderboard();
+  rafId = requestAnimationFrame(tick);
+}
+
+function finishPlayer(keyIndex){
+  if(raceState!=='running') return;
+  if(keyIndex>=current.players) return;
+  if(finishOrder.includes(keyIndex)) return;
+  const t = performance.now()-startTs;
+  stageResults[stage][keyIndex] = t;
+  finishOrder.push(keyIndex);
+  playStopBeep();
+  renderLeaderboard();
+  if(finishOrder.length >= current.players){
+    finishStage();
+  }
+}
+
+function finishStage(){
+  cancelAnimationFrame(rafId);
+  raceClock.textContent = fmt(performance.now()-startTs);
+  if(current.stages===2 && stage===1){
+    raceState='stage-done';
+    raceStatus.textContent = 'STAGE 1 COMPLETE — PRESS ENTER FOR STAGE 2';
+    nextStageBtn.style.display='inline-block';
+  } else {
+    raceState='complete';
+    raceStatus.textContent = 'RACE COMPLETE';
+    if(current.stages===2){
+      stageViewBar.style.display='flex';
+      setResultsView('final');
+    }
+  }
+  renderLeaderboard();
+}
+
+// Moves into Stage 2 in a READY (not running) state — a separate ENTER press starts it.
+function goToStage2(){
+  if(raceState!=='stage-done') return;
+  stage=2;
+  finishOrder=[];
+  raceState='idle';
+  raceClock.textContent = '00:00:00';
+  stagePill.textContent = `STAGE ${stage} / ${current.stages}`;
+  raceStatus.textContent = `STAGE ${stage} — PRESS ENTER TO START`;
+  nextStageBtn.style.display='none';
+  renderLeaderboard();
+}
+
+function setResultsView(view){
+  resultsView = view;
+  document.querySelectorAll('.view-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.view===view);
+  });
+  renderLeaderboard();
+}
+document.querySelectorAll('.view-btn').forEach(b=>{
+  b.addEventListener('click', ()=> setResultsView(b.dataset.view));
+});
+
+function computeFinalRanking(){
+  // combine: for each player, best (lowest) time across stages they finished, else null
+  const best = [];
+  for(let i=0;i<current.players;i++){
+    const t1 = stageResults[1][i];
+    const t2 = stageResults[2] ? stageResults[2][i] : undefined;
+    let val;
+    if(t1!==undefined && t2!==undefined) val = Math.min(t1,t2);
+    else if(t1!==undefined) val = t1;
+    else if(t2!==undefined) val = t2;
+    else val = null;
+    best.push({idx:i, time:val});
+  }
+  const finished = best.filter(b=>b.time!==null).sort((a,b)=>a.time-b.time);
+  const waiting = best.filter(b=>b.time===null);
+  return {finished, waiting};
+}
+
+function renderLeaderboard(){
+  leaderboard.innerHTML='';
+  const medalClass = ['gold','silver','bronze'];
+
+  let finished, waiting;
+  if(current.stages===2 && raceState==='complete'){
+    if(resultsView==='stage1'){
+      finished = Object.entries(stageResults[1]).map(([idx,time])=>({idx:+idx,time})).sort((a,b)=>a.time-b.time);
+      const doneIdx = finished.map(f=>f.idx);
+      waiting = []; for(let i=0;i<current.players;i++) if(!doneIdx.includes(i)) waiting.push({idx:i,time:null});
+    } else if(resultsView==='stage2'){
+      finished = Object.entries(stageResults[2]).map(([idx,time])=>({idx:+idx,time})).sort((a,b)=>a.time-b.time);
+      const doneIdx = finished.map(f=>f.idx);
+      waiting = []; for(let i=0;i<current.players;i++) if(!doneIdx.includes(i)) waiting.push({idx:i,time:null});
+    } else {
+      const r = computeFinalRanking();
+      finished = r.finished; waiting = r.waiting;
+    }
+  } else {
+    finished = finishOrder.map(idx => ({idx, time: stageResults[stage][idx]}));
+    const waitingIdx = [];
+    for(let i=0;i<current.players;i++) if(!finishOrder.includes(i)) waitingIdx.push(i);
+    waiting = waitingIdx.map(idx=>({idx,time:null}));
+  }
+
+  finished.forEach((f,i)=>{
+    const row = document.createElement('div');
+    row.className = 'row' + (i<3 ? ' '+medalClass[i] : '');
+    row.innerHTML = `
+      <div class="rankSecs">
+        <div class="rank">${i+1}</div>
+        <div class="secs">${totalSeconds(f.time)}<span class="secs-label">s</span></div>
+      </div>
+      <div class="time">${fmt(f.time)}</div>
+      <div class="name">${playerLabel(f.idx)} <span class="key-tag">${KEY_LABELS[KEY_ORDER[f.idx]]}</span></div>
+    `;
+    leaderboard.appendChild(row);
+  });
+  waiting.forEach(w=>{
+    const row = document.createElement('div');
+    row.className='row waiting';
+    const liveTime = raceState==='running' ? fmt(performance.now()-startTs) : 'WAITING';
+    row.innerHTML = `
+      <div class="rankSecs">
+        <div class="rank">–</div>
+      </div>
+      <div class="time">${liveTime}</div>
+      <div class="name">${playerLabel(w.idx)} <span class="key-tag">${KEY_LABELS[KEY_ORDER[w.idx]]}</span></div>
+    `;
+    leaderboard.appendChild(row);
+  });
+}
+
+/* ===================== INPUT HANDLING ===================== */
+window.addEventListener('keydown', (e)=>{
+  if(document.getElementById('modalBackdrop').classList.contains('active')) return;
+  if(!document.getElementById('race').classList.contains('active')) return;
+
+  if(e.key==='Enter'){
+    e.preventDefault();
+    if(raceState==='stage-done') goToStage2();
+    else if(raceState==='idle') startRace();
+    return;
+  }
+  if(e.key==='0'){
+    resetRace(true);
+    return;
+  }
+  const ki = KEY_ORDER.indexOf(e.key);
+  if(ki!==-1){
+    finishPlayer(ki);
+  }
+});
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  if(raceState==='idle') startRace();
+});
+document.getElementById('nextStageBtn').addEventListener('click', goToStage2);
+document.getElementById('resetBtn').addEventListener('click', ()=> resetRace(true));
+
+/* ===================== TOUCH GRID (Android / no physical keypad) ===================== */
+const touchGrid = document.getElementById('touchGrid');
+function buildTouchGrid(){
+  touchGrid.innerHTML='';
+  for(let i=0;i<current.players;i++){
+    const b = document.createElement('button');
+    b.className='touch-key';
+    b.title = playerLabel(i);
+    b.innerHTML = `<div style="font-size:16px;">${KEY_LABELS[KEY_ORDER[i]]}</div><div style="font-size:10px;opacity:.75; margin-top:2px; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${playerLabel(i)}</div>`;
+    b.addEventListener('click', ()=> finishPlayer(i));
+    touchGrid.appendChild(b);
+  }
+}
+
+/* ===================== SETTINGS MODAL ===================== */
+const modalBackdrop = document.getElementById('modalBackdrop');
+const stationNameInput = document.getElementById('stationNameInput');
+const playersCountEl = document.getElementById('playersCount');
+const stage1Btn = document.getElementById('stage1Btn');
+const stage2Btn = document.getElementById('stage2Btn');
+const namesGrid = document.getElementById('namesGrid');
+let modalPlayers, modalStages;
+
+function buildNamesGrid(){
+  namesGrid.innerHTML = '';
+  const names = current.names || new Array(13).fill('');
+  for(let i=0;i<13;i++){
+    const row = document.createElement('div');
+    row.className='name-row';
+    row.innerHTML = `
+      <div class="tag">P${i+1} (${KEY_LABELS[KEY_ORDER[i]]})</div>
+      <input type="text" data-idx="${i}" placeholder="Player ${i+1}" value="${(names[i]||'').replace(/"/g,'&quot;')}">
+    `;
+    namesGrid.appendChild(row);
+  }
+}
+
+document.getElementById('settingsBtn').addEventListener('click', ()=>{
+  stationNameInput.value = current.name;
+  modalPlayers = current.players;
+  modalStages = current.stages;
+  playersCountEl.textContent = modalPlayers;
+  syncStageButtons();
+  buildNamesGrid();
+  modalBackdrop.classList.add('active');
+});
+document.getElementById('modalCancel').addEventListener('click', ()=> modalBackdrop.classList.remove('active'));
+document.getElementById('playersMinus').addEventListener('click', ()=>{
+  modalPlayers = Math.max(current.minPlayers, modalPlayers-1);
+  playersCountEl.textContent = modalPlayers;
+});
+document.getElementById('playersPlus').addEventListener('click', ()=>{
+  modalPlayers = Math.min(current.maxPlayers, modalPlayers+1);
+  playersCountEl.textContent = modalPlayers;
+});
+function syncStageButtons(){
+  stage1Btn.classList.toggle('active', modalStages===1);
+  stage2Btn.classList.toggle('active', modalStages===2);
+}
+stage1Btn.addEventListener('click', ()=>{ modalStages=1; syncStageButtons(); });
+stage2Btn.addEventListener('click', ()=>{ modalStages=2; syncStageButtons(); });
+
+document.getElementById('modalSave').addEventListener('click', ()=>{
+  current.name = stationNameInput.value.trim() || current.name;
+  current.players = modalPlayers;
+  current.stages = modalStages;
+
+  const names = current.names ? current.names.slice() : new Array(13).fill('');
+  namesGrid.querySelectorAll('input[type=text]').forEach(inp=>{
+    const idx = +inp.dataset.idx;
+    names[idx] = inp.value.trim();
+  });
+  current.names = names;
+
+  configs[current.id] = {name:current.name, players:current.players, stages:current.stages, names:current.names};
+  saveConfigs();
+
+  modalBackdrop.classList.remove('active');
+  resetRace(true);
+  buildTouchGrid();
+});
+
+/* ===================== INIT ===================== */
+renderHome();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
